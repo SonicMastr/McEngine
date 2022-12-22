@@ -1,1 +1,3 @@
 /McEngine/.settings/language.settings.xml
+*.obj
+/build
