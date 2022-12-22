@@ -24,8 +24,8 @@ Environment::OS VitaSDLEnvironment::getOS()
 
 void VitaSDLEnvironment::sleep(unsigned int us)
 {
-    if (us) // sceKernelDelayThread causes errors on Devkits, but not retail (kinda need this for debugging)
-	    usleep(us);
+	if (us) // sceKernelDelayThread causes errors on Devkits, but not retail (kinda need this for debugging)
+		usleep(us);
 }
 
 void VitaSDLEnvironment::openURLInDefaultBrowser(UString url)
@@ -39,7 +39,7 @@ UString VitaSDLEnvironment::getUsername()
 
 	uUsername = UString("Guest");
 
-    return uUsername;
+	return uUsername;
 }
 
 bool VitaSDLEnvironment::directoryExists(UString directoryName)
@@ -68,12 +68,12 @@ std::vector<UString> VitaSDLEnvironment::getFilesInFolder(UString folder)
 {
 	std::vector<UString> files;
 
-    DIR *dir;
-    struct dirent *ent;
+	DIR *dir;
+	struct dirent *ent;
 
-    dir = opendir(folder.toUtf8());
-    if (dir == NULL)
-    	return files;
+	dir = opendir(folder.toUtf8());
+	if (dir == NULL)
+		return files;
 
 	while ((ent = readdir(dir)))
 	{
@@ -103,12 +103,12 @@ std::vector<UString> VitaSDLEnvironment::getFoldersInFolder(UString folder)
 {
 	std::vector<UString> folders;
 
-    DIR *dir;
-    struct dirent *ent;
+	DIR *dir;
+	struct dirent *ent;
 
-    dir = opendir(folder.toUtf8());
-    if (dir == NULL)
-    	return folders;
+	dir = opendir(folder.toUtf8());
+	if (dir == NULL)
+		return folders;
 
 	while ((ent = readdir(dir)))
 	{

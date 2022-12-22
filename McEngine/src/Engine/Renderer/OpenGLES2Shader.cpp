@@ -218,7 +218,9 @@ bool OpenGLES2Shader::compile(UString vertexShader, UString fragmentShader, bool
 		return false;
 	}
 
+
 	// validate
+#if !defined(__vita__) && !defined(PVR) // VitaGL doesn't have this implemented. Just skip
 	ret = GL_FALSE;
 	glValidateProgram(m_iProgram);
 	glGetProgramiv(m_iProgram, GL_VALIDATE_STATUS, &ret);
@@ -227,7 +229,7 @@ bool OpenGLES2Shader::compile(UString vertexShader, UString fragmentShader, bool
 		engine->showMessageError("Shader Error", "Couldn't glValidateProgram()");
 		return false;
 	}
-
+#endif
 	return true;
 }
 

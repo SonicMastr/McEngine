@@ -59,10 +59,14 @@ target_link_libraries("${ELF}"
   SDL2_mixer
   SDL2_image
   SDL2
-  libgpu_es4_ext_stub_weak
-  libIMGEGL_stub_weak
-  libGLESv2_stub_weak
+  vitaGL
+  vitashark
+  SceShaccCg_stub
+  SceShaccCgExt
+  taihen_stub
+  mathneon
   SceAppMgr_stub
+  SceKernelDmacMgr_stub
   SceProcessmgr_stub
   SceIme_stub_weak
   vorbisfile

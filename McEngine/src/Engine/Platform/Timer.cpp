@@ -49,7 +49,7 @@ Timer::Timer()
 
 	m_timer = new HorizonTimer();
 
-#elif defined __VITA__
+#elif defined __vita__
 
 	m_timer = new VitaTimer();
 

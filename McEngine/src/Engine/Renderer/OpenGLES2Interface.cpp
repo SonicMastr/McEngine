@@ -82,6 +82,7 @@ void OpenGLES2Interface::init()
 
 	//setWireframe(true);
 
+#if !defined(__vita__) && !defined(PVR)
 	UString texturedGenericV =	"#version 100\n"
 								"\n"
 								"attribute vec3 position;\n"
@@ -116,6 +117,34 @@ void OpenGLES2Interface::init()
 								"	gl_FragColor = mix(col, mix(texture2D(tex, texcoords) * col, texcolor, clamp(type - 1.0, 0.0, 1.0)), clamp(type, 0.0, 1.0));\n"
 								"}\n"
 								"\n";
+#else // Need to use CG shaders instead of GLSL
+	UString texturedGenericV =	"void main(\n"
+								"float3 position,\n"
+								"float2 uv,\n"
+								"float4 vcolor,\n"
+								"uniform float type,\n"
+								"uniform float4x4 mvp,\n"
+								"float2 out texcoords : TEXCOORD0,\n"
+								"float4 out texcolor : COLOR,\n"
+								"float4 out gl_Position : POSITION\n"
+								") {\n"
+								"	texcoords = uv;\n"
+								"	texcolor = vcolor;\n"
+								"	gl_Position = mul(float4(position, 1.0f), mvp);\n"
+								"}\n"
+								"\n";
+
+	UString texturedGenericP =	"float4 main(\n"
+								"float2 texcoords : TEXCOORD0,\n"
+								"float4 texcolor : COLOR,\n"
+								"uniform float type,\n"
+								"uniform float4 col,\n"
+								"uniform sampler2D tex\n"
+								") {\n"
+								"	return lerp(col, lerp(tex2D(tex, texcoords) * col, texcolor, clamp(type - 1.0f, 0.0f, 1.0f)), clamp(type, 0.0f, 1.0f));\n"
+								"}\n"
+								"\n";
+#endif
 	m_shaderTexturedGeneric = (OpenGLES2Shader*)createShaderFromSource(texturedGenericV, texturedGenericP);
 	m_shaderTexturedGeneric->load();
 
