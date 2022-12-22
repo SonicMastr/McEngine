@@ -33,7 +33,10 @@
 #include "begin_code.h"
 
 /* Let applications recogonize which SDL Mixer edition is in use: Official or Extended fork by Wohlstand */
-#define SDL_MIXER_X 0
+#define SDL_MIXER_X 1
+#ifdef __vita__
+#undef SDL_MIXER_X
+#endif
 
 #define MIXSDLCALL
 
