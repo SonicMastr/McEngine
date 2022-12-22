@@ -23,6 +23,10 @@
 
 #include "HorizonTimer.h"
 
+#elif defined __vita__
+
+#include "VitaTimer.h"
+
 #endif
 
 Timer::Timer()
@@ -44,6 +48,10 @@ Timer::Timer()
 #elif defined __SWITCH__
 
 	m_timer = new HorizonTimer();
+
+#elif defined __VITA__
+
+	m_timer = new VitaTimer();
 
 #else
 

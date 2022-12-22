@@ -24,7 +24,8 @@ public:
 		OS_WINDOWS,
 		OS_LINUX,
 		OS_MACOS,
-		OS_HORIZON
+		OS_HORIZON,
+		OS_VITA
 	};
 
 public:

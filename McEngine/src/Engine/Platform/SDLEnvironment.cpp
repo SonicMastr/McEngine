@@ -54,7 +54,11 @@ void SDLEnvironment::update()
 Graphics *SDLEnvironment::createRenderer()
 {
 	//return new NullGraphicsInterface();
+#ifdef MCENGINE_FEATURE_OPENGL
+
 	return new SDLGLLegacyInterface(m_window);
+
+#endif
 
 #ifdef MCENGINE_FEATURE_OPENGLES
 

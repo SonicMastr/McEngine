@@ -21,12 +21,12 @@
 /*
  * OpenGL graphics (Desktop, legacy + modern)
  */
-#define MCENGINE_FEATURE_OPENGL
+//#define MCENGINE_FEATURE_OPENGL
 
 /*
  * OpenGL graphics (Mobile, ES/EGL)
  */
-//#define MCENGINE_FEATURE_OPENGLES
+#define MCENGINE_FEATURE_OPENGLES
 
 /*
  * DirectX graphics
@@ -41,7 +41,7 @@
 /*
  * BASS sound
  */
-#define MCENGINE_FEATURE_SOUND
+//#define MCENGINE_FEATURE_SOUND
 
 /*
  * BASS WASAPI sound (Windows only)
@@ -71,12 +71,12 @@
 /*
  * SDL2 main + Environment
  */
-//#define MCENGINE_FEATURE_SDL
+#define MCENGINE_FEATURE_SDL
 
 /*
  * SDL2 mixer (audio)
  */
-//#define MCENGINE_FEATURE_SDL_MIXER
+#define MCENGINE_FEATURE_SDL_MIXER
 
 /*
  * Discord RPC (rich presence)

@@ -9,8 +9,8 @@
 
 #ifdef MCENGINE_FEATURE_SDL
 
-//#define MCENGINE_SDL_JOYSTICK
-//#define MCENGINE_SDL_JOYSTICK_MOUSE
+#define MCENGINE_SDL_JOYSTICK
+#define MCENGINE_SDL_JOYSTICK_MOUSE
 
 #if !defined(MCENGINE_FEATURE_OPENGL) && !defined(MCENGINE_FEATURE_OPENGLES)
 #error OpenGL support is currently required for SDL
@@ -27,14 +27,20 @@
 
 #include "SDLEnvironment.h"
 #include "HorizonSDLEnvironment.h"
+#include "VitaSDLEnvironment.h"
 #include "WinSDLEnvironment.h"
 
 
 
 #define WINDOW_TITLE "McEngine"
 
+#ifdef __vita__
+#define WINDOW_WIDTH (960)
+#define WINDOW_HEIGHT (544)
+#else
 #define WINDOW_WIDTH (1280)
 #define WINDOW_HEIGHT (720)
+#endif
 
 #define WINDOW_WIDTH_MIN 100
 #define WINDOW_HEIGHT_MIN 100

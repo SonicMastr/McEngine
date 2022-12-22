@@ -1,3 +1,4 @@
 /McEngine/.settings/language.settings.xml
 *.obj
 /build
+.vscode/settings.json

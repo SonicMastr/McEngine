@@ -54,4 +54,16 @@
 
 #endif
 
+#ifdef __vita__
+
+#define GL_GLEXT_PROTOTYPES 1
+
+#include <psp2/types.h>
+
+#include <EGL/egl.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+
+#endif
+
 #endif

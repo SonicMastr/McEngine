@@ -50,12 +50,19 @@ ConVar rm_interrupt_on_destroy("rm_interrupt_on_destroy", true);
 ConVar debug_rm("debug_rm", false);
 
 // HACKHACK: do this with env->getOS() or something
-#ifdef __SWITCH__
+#if defined(__SWITCH__)
 
 const char *ResourceManager::PATH_DEFAULT_IMAGES = "romfs:/materials/";
 const char *ResourceManager::PATH_DEFAULT_FONTS = "romfs:/fonts/";
 const char *ResourceManager::PATH_DEFAULT_SOUNDS = "romfs:/sounds/";
 const char *ResourceManager::PATH_DEFAULT_SHADERS = "romfs:/shaders/";
+
+#elif defined(__vita__)
+
+const char *ResourceManager::PATH_DEFAULT_IMAGES = "app0:materials/";
+const char *ResourceManager::PATH_DEFAULT_FONTS = "app0:fonts/";
+const char *ResourceManager::PATH_DEFAULT_SOUNDS = "app0:sounds/";
+const char *ResourceManager::PATH_DEFAULT_SHADERS = "app0:shaders/";
 
 #else
 
