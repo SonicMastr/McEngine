@@ -74,6 +74,7 @@ target_link_libraries("${ELF}"
   webp
   ogg
   mad
+  xmp
   mpg123
   FLAC
   modplug
@@ -111,6 +112,7 @@ target_link_libraries("${ELF}"
   ${OPENSSL_LIBRARIES}
   gcc
   zip
+  bz2
   z
   m
 )
@@ -119,4 +121,10 @@ vita_create_self("${SELF}"
   "${ELF}"
   UNSAFE
   NOASLR
+)
+
+add_custom_target(devkit-launch
+    DEPENDS eboot.bin-self
+    COMMAND psp2run.exe /c:process /debug /kill /workingDirectory:"${CMAKE_CURRENT_BINARY_DIR}" /elf "${CMAKE_CURRENT_BINARY_DIR}/eboot.bin"
+    COMMENT "Launching ${CMAKE_CURRENT_BINARY_DIR}/eboot.bin"
 )

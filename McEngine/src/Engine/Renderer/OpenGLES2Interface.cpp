@@ -603,15 +603,12 @@ void OpenGLES2Interface::setClipping(bool enabled)
 
 void OpenGLES2Interface::setAlphaTesting(bool enabled)
 {
-	if (enabled)
-		glEnable(GL_ALPHA_TEST);
-	else
-		glDisable(GL_ALPHA_TEST);
+	// TODO: implement
 }
 
 void OpenGLES2Interface::setAlphaTestFunc(COMPARE_FUNC alphaFunc, float ref)
 {
-	glAlphaFunc(compareFuncToOpenGL(alphaFunc), ref);
+	// TODO: implement
 }
 
 void OpenGLES2Interface::setBlending(bool enabled)
