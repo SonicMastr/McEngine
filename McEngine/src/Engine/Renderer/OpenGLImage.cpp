@@ -12,6 +12,7 @@
 #include "ResourceManager.h"
 #include "Environment.h"
 #include "Engine.h"
+#include "ConVar.h"
 #include "File.h"
 
 #include "OpenGLHeaders.h"
@@ -53,10 +54,13 @@ void OpenGLImage::init()
 
 #ifdef MCENGINE_FEATURE_OPENGL
 
+		// TODO: wtf, why is this even here? causes texture atlas uv cracks/bleeding on point sampled meshes
+		/*
 		GLfloat maxAnisotropy;
 		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropy);
 		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maxAnisotropy);
 		glGetError(); // clear gl error state (env LIBGL_ALWAYS_SOFTWARE=1 and mesa would break textures otherwise)
+		*/
 
 #endif
 
@@ -108,9 +112,16 @@ void OpenGLImage::init()
 		m_GLTexture = 0;
 		debugLog("OpenGL Image Error: %i on file %s!\n", GLerror, m_sFilePath.toUtf8());
 		engine->showMessageError("Image Error", UString::format("OpenGL Image error %i on file %s", GLerror, m_sFilePath.toUtf8()));
+		return;
 	}
-	else
-		m_bReady = true;
+
+	m_bReady = true;
+
+	if (m_filterMode != Graphics::FILTER_MODE::FILTER_MODE_LINEAR)
+		setFilterMode(m_filterMode);
+
+	if (m_wrapMode != Graphics::WRAP_MODE::WRAP_MODE_CLAMP)
+		setWrapMode(m_wrapMode);
 }
 
 void OpenGLImage::initAsync()
@@ -119,7 +130,9 @@ void OpenGLImage::initAsync()
 
 	if (!m_bCreatedImage)
 	{
-		printf("Resource Manager: Loading %s\n", m_sFilePath.toUtf8());
+		if (ResourceManager::debug_rm->getBool())
+			debugLog("Resource Manager: Loading %s\n", m_sFilePath.toUtf8());
+
 		m_bAsyncReady = loadRawImage();
 	}
 }
@@ -168,9 +181,9 @@ void OpenGLImage::unbind()
 
 void OpenGLImage::setFilterMode(Graphics::FILTER_MODE filterMode)
 {
+	Image::setFilterMode(filterMode);
 	if (!m_bReady) return;
 
-	// TODO: calling setFilterMode or setWrapMode before initialization will not persist
 	bind();
 	{
 		switch (filterMode)
@@ -194,9 +207,9 @@ void OpenGLImage::setFilterMode(Graphics::FILTER_MODE filterMode)
 
 void OpenGLImage::setWrapMode(Graphics::WRAP_MODE wrapMode)
 {
+	Image::setWrapMode(wrapMode);
 	if (!m_bReady) return;
 
-	// TODO: calling setFilterMode or setWrapMode before initialization will not persist
 	bind();
 	{
 		switch (wrapMode)

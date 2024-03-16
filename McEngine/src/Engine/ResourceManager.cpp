@@ -6,6 +6,7 @@
 //===============================================================================//
 
 #include "ResourceManager.h"
+
 #include "Environment.h"
 #include "Engine.h"
 #include "ConVar.h"
@@ -47,7 +48,9 @@ ConVar rm_numthreads("rm_numthreads", 3, "how many parallel resource loader thre
 ConVar rm_warnings("rm_warnings", false);
 ConVar rm_debug_async_delay("rm_debug_async_delay", 0.0f);
 ConVar rm_interrupt_on_destroy("rm_interrupt_on_destroy", true);
-ConVar debug_rm("debug_rm", false);
+ConVar debug_rm_("debug_rm", false);
+
+ConVar *ResourceManager::debug_rm = &debug_rm_;
 
 // HACKHACK: do this with env->getOS() or something
 #if defined(__SWITCH__)
@@ -76,6 +79,7 @@ const char *ResourceManager::PATH_DEFAULT_SHADERS = "shaders/";
 ResourceManager::ResourceManager()
 {
 	m_bNextLoadAsync = false;
+	m_iNumResourceInitPerFrameLimit = 1;
 
 	m_loadingWork.reserve(32);
 
@@ -172,11 +176,12 @@ void ResourceManager::update()
 #endif
 	{
 		// handle load finish (and synchronous init())
+		size_t numResourceInitCounter = 0;
 		for (size_t i=0; i<m_loadingWork.size(); i++)
 		{
 			if (m_loadingWork[i].done.atomic.load())
 			{
-				if (debug_rm.getBool())
+				if (debug_rm->getBool())
 					debugLog("Resource Manager: Worker thread #%i finished.\n", i);
 
 				// copy pointer, so we can stop everything before finishing
@@ -242,11 +247,21 @@ void ResourceManager::update()
 				//if (!isAsyncDestroy)
 
 				rs->load();
+				numResourceInitCounter++;
 
-				//else if (debug_rm.getBool())
+				//else if (debug_rm->getBool())
 				//	debugLog("Resource Manager: Skipping load() due to async destroy of #%i\n", (i + 1));
 
-				break; // NOTE: only allow 1 work item to finish per frame (avoid stutters for e.g. texture uploads)
+				if (m_iNumResourceInitPerFrameLimit > 0 && numResourceInitCounter >= m_iNumResourceInitPerFrameLimit)
+					break; // NOTE: only allow 1 work item to finish per frame (avoid stutters for e.g. texture uploads)
+				else
+				{
+					if (reLock)
+					{
+						reLock = false;
+						g_resourceManagerMutex.lock();
+					}
+				}
 			}
 		}
 
@@ -267,7 +282,7 @@ void ResourceManager::update()
 			{
 				if (m_loadingWork[w].resource.atomic.load() == m_loadingWorkAsyncDestroy[i])
 				{
-					if (debug_rm.getBool())
+					if (debug_rm->getBool())
 						debugLog("Resource Manager: Waiting for async destroy of #%i ...\n", i);
 
 					canBeDestroyed = false;
@@ -277,7 +292,7 @@ void ResourceManager::update()
 
 			if (canBeDestroyed)
 			{
-				if (debug_rm.getBool())
+				if (debug_rm->getBool())
 					debugLog("Resource Manager: Async destroy of #%i\n", i);
 
 				delete m_loadingWorkAsyncDestroy[i]; // implicitly calls release() through the Resource destructor
@@ -311,7 +326,7 @@ void ResourceManager::destroyResource(Resource *rs)
 		return;
 	}
 
-	if (debug_rm.getBool())
+	if (debug_rm->getBool())
 		debugLog("ResourceManager: Destroying %s\n", rs->getName().toUtf8());
 
 #ifdef MCENGINE_FEATURE_MULTITHREADING
@@ -337,7 +352,7 @@ void ResourceManager::destroyResource(Resource *rs)
 		{
 			if (m_loadingWork[w].resource.atomic.load() == rs)
 			{
-				if (debug_rm.getBool())
+				if (debug_rm->getBool())
 					debugLog("Resource Manager: Scheduled async destroy of %s\n", rs->getName().toUtf8());
 
 				if (rm_interrupt_on_destroy.getBool())

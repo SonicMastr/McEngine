@@ -37,6 +37,7 @@ extern int mainSDL(int argc, char *argv[], SDLEnvironment *customSDLEnvironment)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
 	// disable IME text input
+	if (strstr(lpCmdLine, "-noime") != NULL)
 	{
 		typedef BOOL (WINAPI *pfnImmDisableIME)(DWORD);
 
@@ -56,6 +57,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	// if supported (>= Windows Vista), enable DPI awareness so that GetSystemMetrics returns correct values
 	// without this, on e.g. 150% scaling, the screen pixels of a 1080p monitor would be reported by GetSystemMetrics(SM_CXSCREEN/SM_CYSCREEN) as only 720p!
+	if (strstr(lpCmdLine, "-nodpi") == NULL)
 	{
 		typedef WINBOOL (WINAPI *PSPDA)(void);
 		PSPDA g_SetProcessDPIAware = (PSPDA)GetProcAddress(GetModuleHandle(TEXT("user32.dll")), "SetProcessDPIAware");
@@ -166,6 +168,8 @@ ConVar fps_max_background("fps_max_background", 30.0f, "framerate limiter, backg
 ConVar fps_max_background_interleaved("fps_max_background_interleaved", 1, "experimental, update normally but only draw every n-th frame");
 ConVar fps_unlimited("fps_unlimited", false);
 ConVar fps_unlimited_yield("fps_unlimited_yield", true, "always release rest of timeslice once per frame (call scheduler via sleep(0)), even if unlimited fps are enabled");
+
+ConVar win_mouse_raw_input_buffer("win_mouse_raw_input_buffer", false, "use GetRawInputBuffer() to reduce wndproc event queue overflow stalls on insane mouse usb polling rates above 1000 Hz");
 
 extern ConVar *win_realtimestylus;
 
@@ -762,7 +766,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case WM_GETMINMAXINFO:
 			{
 				// NOTE: if rendering via DirectX then don't interfere here, since it handles all window management stuff for us
-#ifdef MCENGINE_FEATURE_DIRECTX
+#ifdef MCENGINE_FEATURE_DIRECTX11
 
 				if (g_engine != NULL && dynamic_cast<DirectX11Interface*>(g_engine->getGraphics()) != NULL)
 					return DefWindowProcW(hwnd, msg, wParam, lParam);
@@ -1050,6 +1054,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 
 	// disable IME text input
+	if (strstr(lpCmdLine, "-noime") != NULL)
 	{
 		typedef BOOL (WINAPI *pfnImmDisableIME)(DWORD);
 
@@ -1079,6 +1084,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// if supported (>= Windows Vista), enable DPI awareness so that GetSystemMetrics returns correct values
 	// without this, on e.g. 150% scaling, the screen pixels of a 1080p monitor would be reported by GetSystemMetrics(SM_CXSCREEN/SM_CYSCREEN) as only 720p!
 	// also on even newer systems (>= Windows 8.1) we can get WM_DPICHANGED notified
+	if (strstr(lpCmdLine, "-nodpi") == NULL)
 	{
 		// Windows 8.1+
 		// per-monitor dpi scaling
@@ -1238,6 +1244,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			float displayFrequency = static_cast<float>(lpDevMode.dmDisplayFrequency);
 			///printf("Display Refresh Rate is %.2f Hz, setting fps_max to %i.\n\n", displayFrequency, (int)displayFrequency);
 			fps_max.setValue((int)displayFrequency);
+			fps_max.setDefaultFloat((int)displayFrequency);
 		}
 	}
 
@@ -1333,6 +1340,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	MSG msg;
 	msg.message = WM_NULL;
 	unsigned long tickCounter = 0;
+	UINT currentRawInputBufferNumBytes = 0;
+	unsigned char *currentRawInputBuffer = NULL;
 	while (g_bRunning)
 	{
 		VPROF_MAIN();
@@ -1341,10 +1350,60 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		{
 			VPROF_BUDGET("Windows", VPROF_BUDGETGROUP_WNDPROC);
 
-			while (PeekMessageW(&msg, NULL, 0U, 0U, PM_REMOVE) != 0)
+			if (win_mouse_raw_input_buffer.getBool())
 			{
-				TranslateMessage(&msg);
-				DispatchMessageW(&msg);
+				UINT minRawInputBufferNumBytes = 0;
+				UINT hr = GetRawInputBuffer(NULL, &minRawInputBufferNumBytes, sizeof(RAWINPUTHEADER));
+				if (hr != (UINT)-1 && minRawInputBufferNumBytes > 0)
+				{
+					// resize buffer up to 1 MB sanity limit (if we lagspike this could easily be hit, 8000 Hz polling rate will produce ~0.12 MB per second)
+					const UINT numAlignmentBytes = 8;
+					const UINT rawInputBufferNumBytes = clamp<UINT>(minRawInputBufferNumBytes * numAlignmentBytes * 1024, 1, 1024 * 1024);
+					if (currentRawInputBuffer == NULL || currentRawInputBufferNumBytes < rawInputBufferNumBytes)
+					{
+						currentRawInputBufferNumBytes = rawInputBufferNumBytes;
+						{
+							if (currentRawInputBuffer != NULL)
+								delete[] currentRawInputBuffer;
+						}
+						currentRawInputBuffer = new unsigned char[currentRawInputBufferNumBytes];
+					}
+
+					// grab and go through all buffered RAWINPUT events
+					hr = GetRawInputBuffer((RAWINPUT*)currentRawInputBuffer, &currentRawInputBufferNumBytes, sizeof(RAWINPUTHEADER));
+					if (hr != (UINT)-1)
+					{
+						RAWINPUT *currentRawInput = (RAWINPUT*)currentRawInputBuffer;
+						for (; hr>0; hr--) // (hr = number of rawInputs)
+						{
+							if (currentRawInput->header.dwType == RIM_TYPEMOUSE)
+							{
+								const LONG lastX = ((RAWINPUT*)(&((BYTE*)currentRawInput)[numAlignmentBytes]))->data.mouse.lLastX;
+								const LONG lastY = ((RAWINPUT*)(&((BYTE*)currentRawInput)[numAlignmentBytes]))->data.mouse.lLastY;
+								const USHORT usFlags = ((RAWINPUT*)(&((BYTE*)currentRawInput)[numAlignmentBytes]))->data.mouse.usFlags;
+
+								g_engine->onMouseRawMove(lastX, lastY, (usFlags & MOUSE_MOVE_ABSOLUTE), (usFlags & MOUSE_VIRTUAL_DESKTOP));
+							}
+
+							currentRawInput = NEXTRAWINPUTBLOCK(currentRawInput);
+						}
+					}
+				}
+
+				// handle all remaining non-WM_INPUT messages
+				while (PeekMessageW(&msg, NULL, 0U, WM_INPUT - 1, PM_REMOVE) != 0 || PeekMessageW(&msg, NULL, WM_INPUT + 1, 0U, PM_REMOVE) != 0)
+				{
+					TranslateMessage(&msg);
+					DispatchMessageW(&msg);
+				}
+			}
+			else
+			{
+				while (PeekMessageW(&msg, NULL, 0U, 0U, PM_REMOVE) != 0)
+				{
+					TranslateMessage(&msg);
+					DispatchMessageW(&msg);
+				}
 			}
 		}
 
@@ -1421,7 +1480,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 			frameTimer->update();
 
-			if (!fps_unlimited.getBool() || inBackground)
+			if ((!fps_unlimited.getBool() && fps_max.getInt() > 0) || inBackground)
 			{
 				double delayStart = frameTimer->getElapsedTime();
 				double delayTime;

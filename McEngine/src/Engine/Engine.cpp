@@ -510,7 +510,7 @@ void Engine::onFocusLost()
 		m_app->onFocusLost();
 
 	// auto minimize on certain conditions
-	if (m_environment->isFullscreen() && !m_environment->isFullscreenWindowedBorderless() && minimize_on_focus_lost_if_fullscreen.getBool())
+	if (m_environment->isFullscreen() || m_environment->isFullscreenWindowedBorderless())
 	{
 		if ((!m_environment->isFullscreenWindowedBorderless() && minimize_on_focus_lost_if_fullscreen.getBool())
 		  || (m_environment->isFullscreenWindowedBorderless() && minimize_on_focus_lost_if_borderless_windowed_fullscreen.getBool()))
@@ -675,6 +675,20 @@ void Engine::onKeyboardKeyDown(KEYCODE keyCode)
 			ConVar *vprof = convar->getConVarByName("vprof");
 			vprof->setValue(vprof->getBool() ? 0.0f : 1.0f);
 			return;
+		}
+
+		// handle profiler display mode change
+		if (m_keyboard->isControlDown() && keyCode == KEY_TAB)
+		{
+			const ConVar *vprof = convar->getConVarByName("vprof");
+			if (vprof->getBool())
+			{
+				if (m_keyboard->isShiftDown())
+					m_visualProfiler->decrementInfoBladeDisplayMode();
+				else
+					m_visualProfiler->incrementInfoBladeDisplayMode();
+				return;
+			}
 		}
 	}
 
@@ -1016,6 +1030,11 @@ void _crash(void)
 	nullPointer->setValue(false);
 }
 
+void _dpiinfo(void)
+{
+	debugLog("env->getDPI() = %i, env->getDPIScale() = %f\n", env->getDPI(), env->getDPIScale());
+}
+
 ConVar _exit_("exit", _exit);
 ConVar _shutdown_("shutdown", _exit);
 ConVar _restart_("restart", _restart);
@@ -1032,3 +1051,4 @@ ConVar _version_("version", _version);
 ConVar _corporeal_("debug_ghost", false, _debugCorporeal);
 ConVar _errortest_("errortest", _errortest);
 ConVar _crash_("crash", _crash);
+ConVar _dpiinfo_("dpiinfo", _dpiinfo);

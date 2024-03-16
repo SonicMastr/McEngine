@@ -327,11 +327,37 @@ void SoundEngine::updateOutputDevices(bool handleOutputDeviceChanges, bool print
 
 		if (d > 0 || allowNoSoundDevice) // the first device doesn't count ("No sound") ~ Default in array
 		{
+			UString originalDeviceName = deviceInfo.name;
+
 			OUTPUT_DEVICE soundDevice;
 			soundDevice.id = d;
-			soundDevice.name = deviceInfo.name;
+			soundDevice.name = originalDeviceName;
 			soundDevice.enabled = isEnabled;
 			soundDevice.isDefault = isDefault;
+
+			// avoid duplicate names
+			int duplicateNameCounter = 2;
+			while (true)
+			{
+				bool foundDuplicateName = false;
+				for (size_t i=0; i<m_outputDevices.size(); i++)
+				{
+					if (m_outputDevices[i].name == soundDevice.name)
+					{
+						foundDuplicateName = true;
+
+						soundDevice.name = originalDeviceName;
+						soundDevice.name.append(UString::format(" (%i)", duplicateNameCounter));
+
+						duplicateNameCounter++;
+
+						break;
+					}
+				}
+
+				if (!foundDuplicateName)
+					break;
+			}
 
 			// detect output device changes
 			// TODO: this causes endless loops on audio devices with chinese/russian etc. characters in their name, may be caused by BASS reordering indices
@@ -640,11 +666,12 @@ void SoundEngine::update()
 	*/
 }
 
-bool SoundEngine::play(Sound *snd, float pan)
+bool SoundEngine::play(Sound *snd, float pan, float pitch)
 {
 	if (!m_bReady || snd == NULL || !snd->isReady()) return false;
 
 	pan = clamp<float>(pan, -1.0f, 1.0f);
+	pitch = clamp<float>(pitch, 0.0f, 2.0f);
 
 	const bool allowPlayFrame = !snd->isOverlayable() || !snd_restrict_play_frame.getBool() || engine->getTime() > snd->getLastPlayTime();
 
@@ -694,6 +721,15 @@ bool SoundEngine::play(Sound *snd, float pan)
 	if (BASS_ChannelIsActive(handle) != BASS_ACTIVE_PLAYING)
 	{
 		BASS_ChannelSetAttribute(handle, BASS_ATTRIB_PAN, pan);
+
+		if (pitch != 1.0f)
+		{
+			float freq = snd_freq.getFloat();
+			BASS_ChannelGetAttribute(handle, BASS_ATTRIB_FREQ, &freq);
+
+			const float semitonesShift = lerp<float>(-60.0f, 60.0f, pitch / 2.0f);
+			BASS_ChannelSetAttribute(handle, BASS_ATTRIB_FREQ, std::pow(2.0f, (semitonesShift / 12.0f)) * freq);
+		}
 
 		if (snd->isStream() && snd->isLooped())
 			BASS_ChannelFlags(handle, BASS_SAMPLE_LOOP, BASS_SAMPLE_LOOP);

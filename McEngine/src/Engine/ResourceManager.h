@@ -8,8 +8,6 @@
 #ifndef RESOURCEMANAGER_H
 #define RESOURCEMANAGER_H
 
-#include "cbase.h"
-
 #include "Image.h"
 #include "Font.h"
 #include "Sound.h"
@@ -18,16 +16,21 @@
 #include "TextureAtlas.h"
 #include "VertexArrayObject.h"
 
+class ConVar;
+
 class ResourceManagerLoaderThread;
 
 class ResourceManager
 {
 public:
+	static ConVar *debug_rm;
+
 	static const char *PATH_DEFAULT_IMAGES;
 	static const char *PATH_DEFAULT_FONTS;
 	static const char *PATH_DEFAULT_SOUNDS;
 	static const char *PATH_DEFAULT_SHADERS;
 
+public:
 	template<typename T>
 	struct MobileAtomic
 	{
@@ -62,6 +65,8 @@ public:
 	~ResourceManager();
 
 	void update();
+
+	void setNumResourceInitPerFrameLimit(size_t numResourceInitPerFrameLimit) {m_iNumResourceInitPerFrameLimit = numResourceInitPerFrameLimit;}
 
 	void loadResource(Resource *rs) {requestNextLoadUnmanaged(); loadResource(rs, true);}
 	void destroyResource(Resource *rs);
@@ -109,6 +114,9 @@ public:
 	Shader *getShader(UString resourceName) const;
 
 	inline const std::vector<Resource*> &getResources() const {return m_vResources;}
+	inline size_t getNumThreads() const {return m_threads.size();}
+	inline size_t getNumLoadingWork() const {return m_loadingWork.size();}
+	inline size_t getNumLoadingWorkAsyncDestroy() const {return m_loadingWorkAsyncDestroy.size();}
 
 	bool isLoading() const;
 	bool isLoadingResource(Resource *rs) const;
@@ -122,11 +130,11 @@ private:
 
 	// content
 	std::vector<Resource*> m_vResources;
-	std::vector<Resource*> m_vAsyncDestroy;
 
 	// flags
 	bool m_bNextLoadAsync;
 	std::stack<bool> m_nextLoadUnmanagedStack;
+	size_t m_iNumResourceInitPerFrameLimit;
 
 	// async
 	std::vector<ResourceManagerLoaderThread*> m_threads;

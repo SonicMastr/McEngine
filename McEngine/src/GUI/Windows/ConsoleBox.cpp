@@ -26,10 +26,91 @@
 ConVar showconsolebox("showconsolebox");
 
 ConVar consolebox_animspeed("consolebox_animspeed", 12.0f);
+ConVar consolebox_draw_preview("consolebox_draw_preview", true, "whether the textbox shows the topmost suggestion while typing");
+ConVar consolebox_draw_helptext("consolebox_draw_helptext", true, "whether convar suggestions also draw their helptext");
 
 ConVar console_overlay("console_overlay", true, "should the log overlay always be visible (or only if the console is out)");
 ConVar console_overlay_lines("console_overlay_lines", 6, "max number of lines of text");
 ConVar console_overlay_scale("console_overlay_scale", 1.0f, "log text size multiplier");
+
+class ConsoleBoxTextbox : public CBaseUITextbox
+{
+public:
+	ConsoleBoxTextbox(float xPos, float yPos, float xSize, float ySize, UString name) : CBaseUITextbox(xPos, yPos, xSize, ySize, name)
+	{
+	}
+
+	void setSuggestion(UString suggestion) {m_sSuggestion = suggestion;}
+
+protected:
+	virtual void drawText(Graphics *g)
+	{
+		if (consolebox_draw_preview.getBool())
+		{
+			if (m_sSuggestion.length() > 0 && m_sSuggestion.find(m_sText) == 0)
+			{
+				g->setColor(0xff444444);
+				g->pushTransform();
+				{
+					g->translate((int)(m_vPos.x + m_iTextAddX + m_fTextScrollAddX), (int)(m_vPos.y + m_iTextAddY));
+					g->drawString(m_font, m_sSuggestion);
+				}
+				g->popTransform();
+			}
+		}
+
+		CBaseUITextbox::drawText(g);
+	}
+
+private:
+	UString m_sSuggestion;
+};
+
+class ConsoleBoxSuggestionButton : public CBaseUIButton
+{
+public:
+	ConsoleBoxSuggestionButton(float xPos, float yPos, float xSize, float ySize, UString name, UString text, UString helpText, ConsoleBox *consoleBox) : CBaseUIButton(xPos, yPos, xSize, ySize, name, text)
+	{
+		m_sHelpText = helpText;
+		m_consoleBox = consoleBox;
+	}
+
+protected:
+	virtual void drawText(Graphics *g)
+	{
+		if (m_font == NULL || m_sText.length() < 1) return;
+
+		if (consolebox_draw_helptext.getBool())
+		{
+			if (m_sHelpText.length() > 0)
+			{
+				const UString helpTextSeparator = "-";
+				const int helpTextOffset = std::round(2.0f * m_font->getStringWidth(helpTextSeparator) * ((float)m_font->getDPI() / 96.0f)); // NOTE: abusing font dpi
+				const int helpTextSeparatorStringWidth = std::max(1, (int)m_font->getStringWidth(helpTextSeparator));
+				const int helpTextStringWidth = std::max(1, (int)m_font->getStringWidth(m_sHelpText));
+
+				g->pushTransform();
+				{
+					const float scale = std::min(1.0f, (std::max(1.0f, m_consoleBox->getTextbox()->getSize().x - m_fStringWidth - helpTextOffset*1.5f - helpTextSeparatorStringWidth*1.5f)) / (float)helpTextStringWidth);
+
+					g->scale(scale, scale);
+					g->translate((int)(m_vPos.x + m_fStringWidth + helpTextOffset*scale/2 + helpTextSeparatorStringWidth*scale), (int)(m_vPos.y + m_vSize.y/2.0f + m_fStringHeight/2.0f - m_font->getHeight()*(1.0f - scale)/2.0f));
+					g->setColor(0xff444444);
+					g->drawString(m_font, helpTextSeparator);
+					g->translate(helpTextOffset*scale, 0);
+					g->drawString(m_font, m_sHelpText);
+				}
+				g->popTransform();
+			}
+		}
+
+		CBaseUIButton::drawText(g);
+	}
+
+private:
+	ConsoleBox *m_consoleBox;
+	UString m_sHelpText;
+};
 
 ConsoleBox::ConsoleBox() : CBaseUIElement(0, 0, 0, 0, "")
 {
@@ -38,7 +119,7 @@ ConsoleBox::ConsoleBox() : CBaseUIElement(0, 0, 0, 0, "")
 	McFont *font = engine->getResourceManager()->getFont("FONT_DEFAULT");
 	m_logFont = engine->getResourceManager()->getFont("FONT_CONSOLE");
 
-	m_textbox = new CBaseUITextbox(5 * dpiScale, engine->getScreenHeight(), engine->getScreenWidth() - 10 * dpiScale, 26, "consoleboxtextbox");
+	m_textbox = new ConsoleBoxTextbox(5 * dpiScale, engine->getScreenHeight(), engine->getScreenWidth() - 10 * dpiScale, 26, "consoleboxtextbox");
 	{
 		m_textbox->setSizeY(m_textbox->getRelSize().y * dpiScale);
 		m_textbox->setFont(font);
@@ -188,6 +269,7 @@ void ConsoleBox::update()
 	{
 		processCommand(m_textbox->getText());
 		m_textbox->clear();
+		m_textbox->setSuggestion("");
 	}
 
 	if (m_bConsoleAnimateOnce)
@@ -287,6 +369,7 @@ void ConsoleBox::onSuggestionClicked(CBaseUIButton *suggestion)
 	if (temp != NULL && (temp->hasValue() || temp->hasCallbackArgs()))
 		text.append(" ");
 
+	m_textbox->setSuggestion("");
 	m_textbox->setText(text);
 	m_textbox->setCursorPosRight();
 	m_textbox->setActive(true);
@@ -308,7 +391,7 @@ void ConsoleBox::onKeyDown(KeyboardEvent &e)
 	{
 		// handle suggestion up/down buttons
 
-		if (e == KEY_DOWN)
+		if (e == KEY_DOWN || (e == KEY_TAB && !engine->getKeyboard()->isShiftDown()))
 		{
 			if (m_iSelectedSuggestion < 1)
 				m_iSelectedSuggestion = m_iSuggestionCount - 1;
@@ -323,6 +406,7 @@ void ConsoleBox::onKeyDown(KeyboardEvent &e)
 				if (temp != NULL && (temp->hasValue() || temp->hasCallbackArgs()))
 					command.append(" ");
 
+				m_textbox->setSuggestion("");
 				m_textbox->setText(command);
 				m_textbox->setCursorPosRight();
 				m_suggestion->scrollToElement(m_vSuggestionButtons[m_iSelectedSuggestion]);
@@ -341,7 +425,7 @@ void ConsoleBox::onKeyDown(KeyboardEvent &e)
 
 			e.consume();
 		}
-		else if (e == KEY_UP)
+		else if (e == KEY_UP || (e == KEY_TAB && engine->getKeyboard()->isShiftDown()))
 		{
 			if (m_iSelectedSuggestion > m_iSuggestionCount-2)
 				m_iSelectedSuggestion = 0;
@@ -356,6 +440,7 @@ void ConsoleBox::onKeyDown(KeyboardEvent &e)
 				if (temp != NULL && (temp->hasValue() || temp->hasCallbackArgs()))
 					command.append(" ");
 
+				m_textbox->setSuggestion("");
 				m_textbox->setText(command);
 				m_textbox->setCursorPosRight();
 				m_suggestion->scrollToElement(m_vSuggestionButtons[m_iSelectedSuggestion]);
@@ -389,6 +474,7 @@ void ConsoleBox::onKeyDown(KeyboardEvent &e)
 			if (m_iSelectedHistory > -1 && m_iSelectedHistory < m_commandHistory.size())
 			{
 				UString text = m_commandHistory[m_iSelectedHistory];
+				m_textbox->setSuggestion("");
 				m_textbox->setText(text);
 				m_textbox->setCursorPosRight();
 			}
@@ -405,6 +491,7 @@ void ConsoleBox::onKeyDown(KeyboardEvent &e)
 			if (m_iSelectedHistory > -1 && m_iSelectedHistory < m_commandHistory.size())
 			{
 				UString text = m_commandHistory[m_iSelectedHistory];
+				m_textbox->setSuggestion("");
 				m_textbox->setText(text);
 				m_textbox->setCursorPosRight();
 			}
@@ -417,6 +504,7 @@ void ConsoleBox::onKeyDown(KeyboardEvent &e)
 void ConsoleBox::onChar(KeyboardEvent &e)
 {
 	if (m_bConsoleAnimateOut && !m_bConsoleAnimateIn) return;
+	if (e == KEY_TAB) return;
 
 	m_textbox->onChar(e);
 
@@ -456,12 +544,17 @@ void ConsoleBox::onChar(KeyboardEvent &e)
 				}
 			}
 
-			addSuggestion(suggestionText, suggestions[i]->getName());
+			addSuggestion(suggestionText, suggestions[i]->getHelpstring(), suggestions[i]->getName());
 		}
 		m_suggestion->setVisible(suggestions.size() > 0);
 
 		if (suggestions.size() > 0)
+		{
 			m_suggestion->scrollToElement(m_suggestion->getContainer()->getElements()[0]);
+			m_textbox->setSuggestion(suggestions[0]->getName());
+		}
+		else
+			m_textbox->setSuggestion("");
 
 		m_iSelectedSuggestion = -1;
 	}
@@ -504,7 +597,7 @@ bool ConsoleBox::isActive()
 	return (m_textbox->isActive() || m_suggestion->isActive()) && m_textbox->isVisible();
 }
 
-void ConsoleBox::addSuggestion(UString text, UString command)
+void ConsoleBox::addSuggestion(const UString &text, const UString &helpText, const UString &command)
 {
 	const float dpiScale = getDPIScale();
 
@@ -514,7 +607,7 @@ void ConsoleBox::addSuggestion(UString text, UString command)
 	const int addheight = (17 + 8) * dpiScale;
 
 	// create button and add it
-	CBaseUIButton *button = new CBaseUIButton(3 * dpiScale, (vsize - 1)*buttonheight + 2 * dpiScale, 100, addheight, command, text);
+	CBaseUIButton *button = new ConsoleBoxSuggestionButton(3 * dpiScale, (vsize - 1)*buttonheight + 2 * dpiScale, 100, addheight, command, text, helpText, this);
 	{
 		button->setDrawFrame(false);
 		button->setSizeX(button->getFont()->getStringWidth(text));

@@ -22,6 +22,8 @@ class CBaseUIButton;
 class CBaseUIScrollView;
 class CBaseUIBoxShadow;
 
+class ConsoleBoxTextbox;
+
 class ConsoleBox : public CBaseUIElement
 {
 public:
@@ -49,6 +51,9 @@ public:
 	bool isBusy();
 	bool isActive();
 
+	// ILLEGAL:
+	inline ConsoleBoxTextbox *getTextbox() const {return m_textbox;}
+
 private:
 	struct LOG_ENTRY
 	{
@@ -59,7 +64,7 @@ private:
 private:
 	void onSuggestionClicked(CBaseUIButton *suggestion);
 
-	void addSuggestion(UString text, UString command);
+	void addSuggestion(const UString &text, const UString &helpText, const UString &command);
 	void clearSuggestions();
 
 	void show();
@@ -72,7 +77,7 @@ private:
 	int m_iSuggestionCount;
 	int m_iSelectedSuggestion; // for up/down buttons
 
-	CBaseUITextbox *m_textbox;
+	ConsoleBoxTextbox *m_textbox;
 	CBaseUIScrollView *m_suggestion;
 	std::vector<CBaseUIButton*> m_vSuggestionButtons;
 	float m_fSuggestionY;

@@ -463,7 +463,7 @@ void OpenGL3Interface::drawVAO(VertexArrayObject *vao)
 	}
 
 	const std::vector<Vector3> &vertices = vao->getVertices();
-	const std::vector<Vector3> &normals = vao->getNormals();
+	///const std::vector<Vector3> &normals = vao->getNormals();
 	const std::vector<std::vector<Vector2>> &texcoords = vao->getTexcoords();
 	const std::vector<Color> &vcolors = vao->getColors();
 
@@ -662,6 +662,19 @@ void OpenGL3Interface::setClipping(bool enabled)
 		glDisable(GL_SCISSOR_TEST);
 }
 
+void OpenGL3Interface::setAlphaTesting(bool enabled)
+{
+	if (enabled)
+		glEnable(GL_ALPHA_TEST);
+	else
+		glDisable(GL_ALPHA_TEST);
+}
+
+void OpenGL3Interface::setAlphaTestFunc(COMPARE_FUNC alphaFunc, float ref)
+{
+	glAlphaFunc(compareFuncToOpenGL(alphaFunc), ref);
+}
+
 void OpenGL3Interface::setBlending(bool enabled)
 {
 	if (enabled)
@@ -842,6 +855,31 @@ int OpenGL3Interface::primitiveToOpenGL(Graphics::PRIMITIVE primitive)
 	}
 
 	return GL_TRIANGLES;
+}
+
+int OpenGL3Interface::compareFuncToOpenGL(Graphics::COMPARE_FUNC compareFunc)
+{
+	switch (compareFunc)
+	{
+	case Graphics::COMPARE_FUNC::COMPARE_FUNC_NEVER:
+		return GL_NEVER;
+	case Graphics::COMPARE_FUNC::COMPARE_FUNC_LESS:
+		return GL_LESS;
+	case Graphics::COMPARE_FUNC::COMPARE_FUNC_EQUAL:
+		return GL_EQUAL;
+	case Graphics::COMPARE_FUNC::COMPARE_FUNC_LESSEQUAL:
+		return GL_LEQUAL;
+	case Graphics::COMPARE_FUNC::COMPARE_FUNC_GREATER:
+		return GL_GREATER;
+	case Graphics::COMPARE_FUNC::COMPARE_FUNC_NOTEQUAL:
+		return GL_NOTEQUAL;
+	case Graphics::COMPARE_FUNC::COMPARE_FUNC_GREATEREQUAL:
+		return GL_GEQUAL;
+	case Graphics::COMPARE_FUNC::COMPARE_FUNC_ALWAYS:
+		return GL_ALWAYS;
+	}
+
+	return GL_ALWAYS;
 }
 
 #endif
