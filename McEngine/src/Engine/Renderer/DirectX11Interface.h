@@ -103,19 +103,23 @@ public:
 	virtual Image *createImage(UString filePath, bool mipmapped, bool keepInSystemMemory);
 	virtual Image *createImage(int width, int height, bool mipmapped, bool keepInSystemMemory);
 	virtual RenderTarget *createRenderTarget(int x, int y, int width, int height, Graphics::MULTISAMPLE_TYPE multiSampleType);
-	virtual Shader *createShaderFromFile(UString vertexShaderFilePath, UString fragmentShaderFilePath);
-	virtual Shader *createShaderFromSource(UString vertexShader, UString fragmentShader);
+	virtual Shader *createShaderFromFile(UString vertexShaderFilePath, UString fragmentShaderFilePath);	// DEPRECATED
+	virtual Shader *createShaderFromSource(UString vertexShader, UString fragmentShader);				// DEPRECATED
+	virtual Shader *createShaderFromFile(UString shaderFilePath);
+	virtual Shader *createShaderFromSource(UString shaderSource);
 	virtual VertexArrayObject *createVertexArrayObject(Graphics::PRIMITIVE primitive, Graphics::USAGE_TYPE usage, bool keepInSystemMemory);
 
 	// ILLEGAL:
 	void resizeTarget(Vector2 newResolution);
 	bool enableFullscreen(bool borderlessWindowedFullscreen = false);
 	void disableFullscreen();
+	void setActiveShader(DirectX11Shader *shader) {m_activeShader = shader;}
 	inline bool isReady() const {return m_bReady;}
-	ID3D11Device *getDevice() const {return m_device;}
-	ID3D11DeviceContext *getDeviceContext() const {return m_deviceContext;}
-	IDXGISwapChain *getSwapChain() const {return m_swapChain;}
-	DirectX11Shader *getShaderGeneric() const {return m_shaderTexturedGeneric;}
+	inline ID3D11Device *getDevice() const {return m_device;}
+	inline ID3D11DeviceContext *getDeviceContext() const {return m_deviceContext;}
+	inline IDXGISwapChain *getSwapChain() const {return m_swapChain;}
+	inline DirectX11Shader *getShaderGeneric() const {return m_shaderTexturedGeneric;}
+	inline DirectX11Shader *getActiveShader() const {return m_activeShader;}
 
 protected:
 	virtual void init();
@@ -125,6 +129,7 @@ private:
 	static int primitiveToDirectX(Graphics::PRIMITIVE primitive);
 	static int compareFuncToDirectX(Graphics::COMPARE_FUNC compareFunc);
 
+private:
 	bool m_bReady;
 
 	// device context
@@ -154,10 +159,6 @@ private:
 	ID3D11BlendState *m_blendState;
 	D3D11_BLEND_DESC m_blendDesc;
 
-	Matrix4 m_projectionMatrix;
-	Matrix4 m_worldMatrix;
-	Matrix4 m_MP;
-
 	DirectX11Shader *m_shaderTexturedGeneric;
 
 	std::vector<SimpleVertex> m_vertices;
@@ -169,9 +170,13 @@ private:
 	// persistent vars
 	bool m_bVSync;
 	Color m_color;
+	DirectX11Shader *m_activeShader;
 
 	// clipping
 	std::stack<McRect> m_clipRectStack;
+
+	// stats
+	int m_iStatsNumDrawCalls;
 };
 
 #endif

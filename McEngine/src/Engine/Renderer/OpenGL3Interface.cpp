@@ -21,6 +21,14 @@
 
 #include "OpenGLHeaders.h"
 
+#define GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX			0x9047
+#define GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX		0x9048
+#define GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX	0x9049
+
+#define VBO_FREE_MEMORY_ATI								0x87FB
+#define TEXTURE_FREE_MEMORY_ATI							0x87FC
+#define RENDERBUFFER_FREE_MEMORY_ATI					0x87FD
+
 OpenGL3Interface::OpenGL3Interface() : Graphics()
 {
 	// renderer
@@ -766,14 +774,46 @@ UString OpenGL3Interface::getVersion()
 
 int OpenGL3Interface::getVRAMTotal()
 {
-	// TODO
-	return -1;
+	int nvidiaMemory[4];
+	int atiMemory[4];
+	
+	for (int i=0; i<4; i++)
+	{
+		nvidiaMemory[i] = -1;
+		atiMemory[i] = -1;
+	}
+
+	glGetIntegerv(GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, nvidiaMemory);
+	glGetIntegerv(TEXTURE_FREE_MEMORY_ATI, atiMemory);
+
+	glGetError(); // clear error state
+
+	if (nvidiaMemory[0] < 1)
+		return atiMemory[0];
+	else
+		return nvidiaMemory[0];
 }
 
 int OpenGL3Interface::getVRAMRemaining()
 {
-	// TODO
-	return -1;
+	int nvidiaMemory[4];
+	int atiMemory[4];
+	
+	for (int i=0; i<4; i++)
+	{
+		nvidiaMemory[i] = -1;
+		atiMemory[i] = -1;
+	}
+
+	glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, nvidiaMemory);
+	glGetIntegerv(TEXTURE_FREE_MEMORY_ATI, atiMemory);
+
+	glGetError(); // clear error state
+
+	if (nvidiaMemory[0] < 1)
+		return atiMemory[0];
+	else
+		return nvidiaMemory[0];
 }
 
 void OpenGL3Interface::onResolutionChange(Vector2 newResolution)
@@ -813,6 +853,16 @@ Shader *OpenGL3Interface::createShaderFromFile(UString vertexShaderFilePath, USt
 Shader *OpenGL3Interface::createShaderFromSource(UString vertexShader, UString fragmentShader)
 {
 	return new OpenGLShader(vertexShader, fragmentShader, true);
+}
+
+Shader *OpenGL3Interface::createShaderFromFile(UString shaderFilePath)
+{
+	return new OpenGLShader(shaderFilePath, false);
+}
+
+Shader *OpenGL3Interface::createShaderFromSource(UString shaderSource)
+{
+	return new OpenGLShader(shaderSource, true);
 }
 
 VertexArrayObject *OpenGL3Interface::createVertexArrayObject(Graphics::PRIMITIVE primitive, Graphics::USAGE_TYPE usage, bool keepInSystemMemory)

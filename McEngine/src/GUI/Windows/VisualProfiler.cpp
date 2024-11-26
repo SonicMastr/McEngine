@@ -19,19 +19,19 @@
 
 #include <string.h>
 
-ConVar vprof_graph("vprof_graph", true, "whether to draw the graph when the overlay is enabled");
-ConVar vprof_graph_height("vprof_graph_height", 250.0f);
-ConVar vprof_graph_width("vprof_graph_width", 800.0f);
-ConVar vprof_graph_margin("vprof_graph_margin", 40.0f);
-ConVar vprof_graph_range_max("vprof_graph_range_max", 16.666666f, "max value of the y-axis in milliseconds");
-ConVar vprof_graph_alpha("vprof_graph_alpha", 1.0f, "line opacity");
-ConVar vprof_graph_draw_overhead("vprof_graph_draw_overhead", false, "whether to draw the profiling overhead time in white (usually negligible)");
+ConVar vprof_graph("vprof_graph", true, FCVAR_NONE, "whether to draw the graph when the overlay is enabled");
+ConVar vprof_graph_height("vprof_graph_height", 250.0f, FCVAR_NONE);
+ConVar vprof_graph_width("vprof_graph_width", 800.0f, FCVAR_NONE);
+ConVar vprof_graph_margin("vprof_graph_margin", 40.0f, FCVAR_NONE);
+ConVar vprof_graph_range_max("vprof_graph_range_max", 16.666666f, FCVAR_NONE, "max value of the y-axis in milliseconds");
+ConVar vprof_graph_alpha("vprof_graph_alpha", 1.0f, FCVAR_NONE, "line opacity");
+ConVar vprof_graph_draw_overhead("vprof_graph_draw_overhead", false, FCVAR_NONE, "whether to draw the profiling overhead time in white (usually negligible)");
 
-ConVar vprof_spike("vprof_spike", 0, "measure and display largest spike details (1 = small info, 2 = extended info)");
+ConVar vprof_spike("vprof_spike", 0, FCVAR_NONE, "measure and display largest spike details (1 = small info, 2 = extended info)");
 
-ConVar vprof_display_mode("vprof_display_mode", 0, "which info blade to show on the top right (gpu/engine/app/etc. info), use CTRL + TAB to cycle through, 0 = disabled");
+ConVar vprof_display_mode("vprof_display_mode", 0, FCVAR_NONE, "which info blade to show on the top right (gpu/engine/app/etc. info), use CTRL + TAB to cycle through, 0 = disabled");
 
-ConVar debug_vprof("debug_vprof", false);
+ConVar debug_vprof("debug_vprof", false, FCVAR_NONE);
 
 ConVar *VisualProfiler::m_vprof_ref = NULL;
 
@@ -138,6 +138,11 @@ void VisualProfiler::draw(Graphics *g)
 					addTextLine(UString::format("Time: %f", time), textFont, m_textLines);
 					addTextLine(UString::format("Realtime: %f", timeRunning), textFont, m_textLines);
 					addTextLine(UString::format("Time Dilation: %f", dilation), textFont, m_textLines);
+
+					for (size_t i=0; i<m_engineTextLines.size(); i++)
+					{
+						addTextLine(m_engineTextLines[i], textFont, m_textLines);
+					}
 				}
 				break;
 
@@ -206,6 +211,7 @@ void VisualProfiler::draw(Graphics *g)
 		}
 
 		m_textLines.clear();
+		m_engineTextLines.clear();
 		m_appTextLines.clear();
 	}
 
@@ -615,6 +621,13 @@ void VisualProfiler::decrementInfoBladeDisplayMode()
 		vprof_display_mode.setValue(INFO_BLADE_DISPLAY_MODE::INFO_BLADE_DISPLAY_MODE_COUNT - 1);
 	else
 		vprof_display_mode.setValue(vprof_display_mode.getInt() - 1);
+}
+
+void VisualProfiler::addInfoBladeEngineTextLine(const UString &text)
+{
+	if (!m_vprof_ref->getBool() || !m_bVisible || vprof_display_mode.getInt() != INFO_BLADE_DISPLAY_MODE::INFO_BLADE_DISPLAY_MODE_ENGINE_INFO) return;
+
+	m_engineTextLines.push_back(text);
 }
 
 void VisualProfiler::addInfoBladeAppTextLine(const UString &text)

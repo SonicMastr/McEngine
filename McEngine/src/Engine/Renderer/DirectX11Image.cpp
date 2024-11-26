@@ -48,50 +48,54 @@ void DirectX11Image::init()
 
 	HRESULT hr;
 
-	DirectX11Interface *g = ((DirectX11Interface*)engine->getGraphics());
+	DirectX11Interface *dx11 = ((DirectX11Interface*)engine->getGraphics());
 	if (m_interfaceOverrideHack != NULL)
-		g = m_interfaceOverrideHack;
+		dx11 = m_interfaceOverrideHack;
 
+	// create texture (with initial data)
 	D3D11_TEXTURE2D_DESC textureDesc;
+	D3D11_SUBRESOURCE_DATA initData;
 	{
-		textureDesc.Width = (UINT)m_iWidth;
-		textureDesc.Height = (UINT)m_iHeight;
-		textureDesc.MipLevels = 1;
-		textureDesc.ArraySize = 1;
-		textureDesc.Format = m_iNumChannels == 4 ? DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM : (m_iNumChannels == 3 ? DXGI_FORMAT::DXGI_FORMAT_R8_UNORM : (m_iNumChannels == 1 ? DXGI_FORMAT::DXGI_FORMAT_R8_UNORM : DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM));
-		textureDesc.SampleDesc.Count = 1;
-		textureDesc.SampleDesc.Quality = 0;
-		textureDesc.Usage = (m_bKeepInSystemMemory ? D3D11_USAGE::D3D11_USAGE_DYNAMIC : D3D11_USAGE::D3D11_USAGE_DEFAULT);
-		textureDesc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
-		textureDesc.CPUAccessFlags = (m_bKeepInSystemMemory ? D3D11_CPU_ACCESS_FLAG::D3D11_CPU_ACCESS_WRITE : 0);
-		textureDesc.MiscFlags = m_bShared ? D3D11_RESOURCE_MISC_FLAG::D3D11_RESOURCE_MISC_SHARED : 0;
+		// default desc
+		{
+			textureDesc.Width = (UINT)m_iWidth;
+			textureDesc.Height = (UINT)m_iHeight;
+			textureDesc.MipLevels = (m_bMipmapped ? 0 : 1);
+			textureDesc.ArraySize = 1;
+			textureDesc.Format = m_iNumChannels == 4 ? DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM : (m_iNumChannels == 3 ? DXGI_FORMAT::DXGI_FORMAT_R8_UNORM : (m_iNumChannels == 1 ? DXGI_FORMAT::DXGI_FORMAT_R8_UNORM : DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM));
+			textureDesc.SampleDesc.Count = 1;
+			textureDesc.SampleDesc.Quality = 0;
+			textureDesc.Usage = (m_bKeepInSystemMemory ? D3D11_USAGE::D3D11_USAGE_DYNAMIC : D3D11_USAGE::D3D11_USAGE_DEFAULT);
+			textureDesc.BindFlags = (m_bMipmapped ? D3D11_BIND_FLAG::D3D11_BIND_RENDER_TARGET : 0) | D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
+			textureDesc.CPUAccessFlags = (m_bKeepInSystemMemory ? D3D11_CPU_ACCESS_FLAG::D3D11_CPU_ACCESS_WRITE : 0);
+			textureDesc.MiscFlags = (m_bMipmapped ? D3D11_RESOURCE_MISC_FLAG::D3D11_RESOURCE_MISC_GENERATE_MIPS : 0) | (m_bShared ? D3D11_RESOURCE_MISC_FLAG::D3D11_RESOURCE_MISC_SHARED : 0);
+		}
+
+		// upload new/overwrite data (not mipmapped) (1/2)
+		if (m_texture == NULL)
+		{
+			// initData
+			{
+				initData.pSysMem = (void*)&m_rawImage[0];
+				initData.SysMemPitch = static_cast<UINT>(m_iWidth * m_iNumChannels * sizeof(unsigned char));
+				initData.SysMemSlicePitch = 0;
+			}
+			hr = dx11->getDevice()->CreateTexture2D(&textureDesc, (!m_bMipmapped && m_rawImage.size() >= m_iWidth * m_iHeight * m_iNumChannels ? &initData : NULL), &m_texture);
+			if (FAILED(hr) || m_texture == NULL)
+			{
+				debugLog("DirectX Image Error: Couldn't CreateTexture2D(%ld, %x, %x) on file %s!\n", hr, hr, MAKE_DXGI_HRESULT(hr), m_sFilePath.toUtf8());
+				engine->showMessageError("Image Error", UString::format("DirectX Image error, couldn't CreateTexture2D(%ld, %x, %x) on file %s", hr, hr, MAKE_DXGI_HRESULT(hr), m_sFilePath.toUtf8()));
+				return;
+			}
+		}
+		else
+		{
+			// TODO: Map(), upload m_rawImage, Unmap()
+		}
 	}
 
-	if (m_texture == NULL)
-	{
-		// create texture (with initial data)
-		D3D11_SUBRESOURCE_DATA initData;
-		{
-			initData.pSysMem = (void*)&m_rawImage[0];
-			initData.SysMemPitch = static_cast<UINT>(m_iWidth*m_iNumChannels);
-			initData.SysMemSlicePitch = 0;
-		}
-		hr = g->getDevice()->CreateTexture2D(&textureDesc, (m_rawImage.size() >= m_iWidth*m_iHeight*m_iNumChannels ? &initData : NULL), &m_texture);
-		if (FAILED(hr) || m_texture == NULL)
-		{
-			debugLog("DirectX Image Error: Couldn't CreateTexture2D(%ld, %x, %x) on file %s!\n", hr, hr, MAKE_DXGI_HRESULT(hr), m_sFilePath.toUtf8());
-			engine->showMessageError("Image Error", UString::format("DirectX Image error, couldn't CreateTexture2D(%ld, %x, %x) on file %s", hr, hr, MAKE_DXGI_HRESULT(hr), m_sFilePath.toUtf8()));
-			return;
-		}
-	}
-	else
-	{
-		// upload data to existing texture
-		// TODO: Map(), upload m_rawImage, Unmap()
-	}
-
-	// free memory
-	if (!m_bKeepInSystemMemory)
+	// free memory (not mipmapped) (1/2)
+	if (!m_bKeepInSystemMemory && !m_bMipmapped)
 		m_rawImage = std::vector<unsigned char>();
 
 	// create shader resource view
@@ -99,13 +103,14 @@ void DirectX11Image::init()
 	{
 		D3D11_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc;
 		{
-			memset(&shaderResourceViewDesc, 0, sizeof(shaderResourceViewDesc));
+			ZeroMemory(&shaderResourceViewDesc, sizeof(shaderResourceViewDesc));
 
 			shaderResourceViewDesc.Format = textureDesc.Format;
 			shaderResourceViewDesc.ViewDimension = D3D_SRV_DIMENSION::D3D11_SRV_DIMENSION_TEXTURE2D;
-			shaderResourceViewDesc.Texture2D.MipLevels = 1;
+			shaderResourceViewDesc.Texture2D.MipLevels = (m_bMipmapped ? (UINT)(std::log2((double)std::max(m_iWidth, m_iHeight))) : 1);
+			shaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
 		}
-		hr = g->getDevice()->CreateShaderResourceView(m_texture, &shaderResourceViewDesc, &m_shaderResourceView);
+		hr = dx11->getDevice()->CreateShaderResourceView(m_texture, &shaderResourceViewDesc, &m_shaderResourceView);
 		if (FAILED(hr) || m_shaderResourceView == NULL)
 		{
 			m_texture->Release();
@@ -116,41 +121,63 @@ void DirectX11Image::init()
 
 			return;
 		}
+
+		// upload new/overwrite data (mipmapped) (2/2)
+		if (m_bMipmapped)
+			dx11->getDeviceContext()->UpdateSubresource(m_texture, 0, NULL, initData.pSysMem, initData.SysMemPitch, initData.SysMemPitch * (UINT)m_iHeight);
 	}
+
+	// free memory (mipmapped) (2/2)
+	if (!m_bKeepInSystemMemory && m_bMipmapped)
+		m_rawImage = std::vector<unsigned char>();
+
+	// create mipmaps
+	if (m_bMipmapped)
+		dx11->getDeviceContext()->GenerateMips(m_shaderResourceView);
 
 	// create sampler
 	{
-		ZeroMemory(&m_samplerDesc, sizeof(m_samplerDesc));
+		// default sampler
+		if (m_samplerState == NULL)
+		{
+			ZeroMemory(&m_samplerDesc, sizeof(m_samplerDesc));
 
-		m_samplerDesc.Filter = D3D11_FILTER::D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-		m_samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE::D3D11_TEXTURE_ADDRESS_CLAMP;
-		m_samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE::D3D11_TEXTURE_ADDRESS_CLAMP;
-		m_samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE::D3D11_TEXTURE_ADDRESS_CLAMP;
-		m_samplerDesc.MinLOD = -D3D11_FLOAT32_MAX;
-		m_samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
-		m_samplerDesc.MipLODBias = 0.0f;
-		m_samplerDesc.MaxAnisotropy = 1;
-		m_samplerDesc.ComparisonFunc = D3D11_COMPARISON_FUNC::D3D11_COMPARISON_NEVER;
-		m_samplerDesc.BorderColor[0] = 1.0f;
-		m_samplerDesc.BorderColor[1] = 1.0f;
-		m_samplerDesc.BorderColor[2] = 1.0f;
-		m_samplerDesc.BorderColor[3] = 1.0f;
-	}
-	createOrUpdateSampler();
-	if (m_samplerState == NULL)
-	{
-		debugLog("DirectX Image Error: Couldn't CreateSamplerState() on file %s!\n");
-		engine->showMessageError("Image Error", UString::format("Couldn't CreateSamplerState() on file %s!", m_sFilePath.toUtf8()));
-		return;
+			m_samplerDesc.Filter = D3D11_FILTER::D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+			m_samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE::D3D11_TEXTURE_ADDRESS_CLAMP;
+			m_samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE::D3D11_TEXTURE_ADDRESS_CLAMP;
+			m_samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE::D3D11_TEXTURE_ADDRESS_CLAMP;
+			m_samplerDesc.MinLOD = -D3D11_FLOAT32_MAX;
+			m_samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+			m_samplerDesc.MipLODBias = 0.0f; // TODO: make this configurable somehow (per texture, but also some kind of global override convar?)
+			m_samplerDesc.MaxAnisotropy = 1; // TODO: anisotropic filtering support (valid range 1 to 16)
+			m_samplerDesc.ComparisonFunc = D3D11_COMPARISON_FUNC::D3D11_COMPARISON_NEVER;
+			m_samplerDesc.BorderColor[0] = 1.0f;
+			m_samplerDesc.BorderColor[1] = 1.0f;
+			m_samplerDesc.BorderColor[2] = 1.0f;
+			m_samplerDesc.BorderColor[3] = 1.0f;
+		}
+
+		// customize sampler
+		// NOTE: this concatenates into one single actual createOrUpdateSampler() call below because we are not m_bReady yet here on purpose
+		{
+			if (m_filterMode != Graphics::FILTER_MODE::FILTER_MODE_LINEAR)
+				setFilterMode(m_filterMode);
+
+			if (m_wrapMode != Graphics::WRAP_MODE::WRAP_MODE_CLAMP)
+				setWrapMode(m_wrapMode);
+		}
+
+		// actually create the (customized) sampler now
+		createOrUpdateSampler();
+		if (m_samplerState == NULL)
+		{
+			debugLog("DirectX Image Error: Couldn't CreateSamplerState() on file %s!\n");
+			engine->showMessageError("Image Error", UString::format("Couldn't CreateSamplerState() on file %s!", m_sFilePath.toUtf8()));
+			return;
+		}
 	}
 
 	m_bReady = true;
-
-	if (m_filterMode != Graphics::FILTER_MODE::FILTER_MODE_LINEAR)
-		setFilterMode(m_filterMode);
-
-	if (m_wrapMode != Graphics::WRAP_MODE::WRAP_MODE_CLAMP)
-		setWrapMode(m_wrapMode);
 }
 
 void DirectX11Image::initAsync()
@@ -162,8 +189,7 @@ void DirectX11Image::initAsync()
 
 		m_bAsyncReady = loadRawImage();
 
-		// rewrite all non-4-channels-per-pixel formats, because directx doesn't have any fucking 24bpp formats ffs
-		// TODO: optimize this
+		// rewrite all non-4-channels-per-pixel formats, because directx11 doesn't have any fucking 24bpp formats ffs
 		if (m_bAsyncReady)
 		{
 			const int numTargetChannels = 4;
@@ -172,36 +198,46 @@ void DirectX11Image::initAsync()
 			if (numMissingChannels > 0)
 			{
 				std::vector<unsigned char> newRawImage;
-				newRawImage.reserve(m_iWidth*m_iHeight*numTargetChannels);
-
-				for (size_t i=0; i<m_rawImage.size(); i+=m_iNumChannels) // for every pixel
+				newRawImage.reserve(m_iWidth * m_iHeight * numTargetChannels);
 				{
-					// add original data
-					for (int p=0; p<m_iNumChannels; p++)
-					{
-						newRawImage.push_back(m_rawImage[i + p]);
-					}
-
-					// add padded data
 					if (m_iNumChannels == 1)
 					{
-						newRawImage.push_back(m_rawImage[i + 0]);	// G
-						newRawImage.push_back(m_rawImage[i + 0]);	// B
-						newRawImage.push_back(0xff);				// A
+						for (size_t c=0; c<m_rawImage.size(); c+=(size_t)m_iNumChannels)
+						{
+							newRawImage.push_back(m_rawImage[c + 0]);	// R
+							newRawImage.push_back(m_rawImage[c + 0]);	// G
+							newRawImage.push_back(m_rawImage[c + 0]);	// B
+							newRawImage.push_back(0xff);				// A
+						}
 					}
 					else if (m_iNumChannels == 3)
 					{
-						newRawImage.push_back(0xff);				// A
+						for (size_t c=0; c<m_rawImage.size(); c+=(size_t)m_iNumChannels)
+						{
+							newRawImage.push_back(m_rawImage[c + 0]);	// R
+							newRawImage.push_back(m_rawImage[c + 1]);	// G
+							newRawImage.push_back(m_rawImage[c + 2]);	// B
+							newRawImage.push_back(0xff);				// A
+						}
 					}
 					else
 					{
-						for (int m=0; m<numMissingChannels; m++)
+						for (size_t c=0; c<m_rawImage.size(); c+=(size_t)m_iNumChannels)
 						{
-							newRawImage.push_back(0xff);			// B, A
+							// add original data
+							for (int p=0; p<m_iNumChannels; p++)
+							{
+								newRawImage.push_back(m_rawImage[c + p]);
+							}
+
+							// add padded data
+							for (int m=0; m<numMissingChannels; m++)
+							{
+								newRawImage.push_back(0xff);
+							}
 						}
 					}
 				}
-
 				m_rawImage = std::move(newRawImage);
 				m_iNumChannels = numTargetChannels;
 			}
@@ -232,10 +268,13 @@ void DirectX11Image::bind(unsigned int textureUnit)
 
 	m_iTextureUnitBackup = textureUnit;
 
-	((DirectX11Interface*)engine->getGraphics())->getDeviceContext()->PSGetShaderResources(textureUnit, 1, &m_prevShaderResourceView); // backup
+	// backup
+	// HACKHACK: slow af
+	{
+		((DirectX11Interface*)engine->getGraphics())->getDeviceContext()->PSGetShaderResources(textureUnit, 1, &m_prevShaderResourceView);
+	}
 
 	((DirectX11Interface*)engine->getGraphics())->getDeviceContext()->PSSetShaderResources(textureUnit, 1, &m_shaderResourceView);
-
 	((DirectX11Interface*)engine->getGraphics())->getDeviceContext()->PSSetSamplers(textureUnit, 1, &m_samplerState);
 
 	// HACKHACK: TEMP:
@@ -246,50 +285,43 @@ void DirectX11Image::unbind()
 {
 	if (!m_bReady) return;
 
-	((DirectX11Interface*)engine->getGraphics())->getDeviceContext()->PSSetShaderResources(m_iTextureUnitBackup, 1, &m_prevShaderResourceView); // restore
-
-	// refcount
+	// restore
+	// HACKHACK: slow af
 	{
-		if (m_prevShaderResourceView != NULL)
+		((DirectX11Interface*)engine->getGraphics())->getDeviceContext()->PSSetShaderResources(m_iTextureUnitBackup, 1, &m_prevShaderResourceView);
+
+		// refcount
 		{
-			m_prevShaderResourceView->Release();
-			m_prevShaderResourceView = NULL;
+			if (m_prevShaderResourceView != NULL)
+			{
+				m_prevShaderResourceView->Release();
+				m_prevShaderResourceView = NULL;
+			}
 		}
 	}
-}
-
-void DirectX11Image::createOrUpdateSampler()
-{
-	if (m_samplerState != NULL)
-	{
-		m_samplerState->Release();
-		m_samplerState = NULL;
-	}
-
-	((DirectX11Interface*)engine->getGraphics())->getDevice()->CreateSamplerState(&m_samplerDesc, &m_samplerState);
 }
 
 void DirectX11Image::setFilterMode(Graphics::FILTER_MODE filterMode)
 {
 	Image::setFilterMode(filterMode);
-	if (!m_bReady) return;
-
-	// TODO: where does D3D11_FILTER_TYPE come into play?
 
 	switch (filterMode)
 	{
 	case Graphics::FILTER_MODE::FILTER_MODE_NONE:
-		// TODO: fix with D3D11_FILTER_TYPE or something
 		m_samplerDesc.Filter = D3D11_FILTER::D3D11_FILTER_MIN_MAG_MIP_POINT;
 		break;
 	case Graphics::FILTER_MODE::FILTER_MODE_LINEAR:
 		m_samplerDesc.Filter = D3D11_FILTER::D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 		break;
 	case Graphics::FILTER_MODE::FILTER_MODE_MIPMAP:
-		// TODO: the name "FILTER_MODE_MIPMAP" is actually bad, should probably be FILTER_MODE_ANISOTROPIC? (i.e. GL_LINEAR_MIPMAP_LINEAR min should be default)
 		m_samplerDesc.Filter = D3D11_FILTER::D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 		break;
 	}
+
+	// TODO: anisotropic filtering support (m_samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC), needs new FILTER_MODE_ANISOTROPIC and support in other renderers (implies mipmapping)
+
+	if (!m_bReady)
+		return;
 
 	createOrUpdateSampler();
 }
@@ -297,7 +329,6 @@ void DirectX11Image::setFilterMode(Graphics::FILTER_MODE filterMode)
 void DirectX11Image::setWrapMode(Graphics::WRAP_MODE wrapMode)
 {
 	Image::setWrapMode(wrapMode);
-	if (!m_bReady) return;
 
 	switch (wrapMode)
 	{
@@ -313,7 +344,21 @@ void DirectX11Image::setWrapMode(Graphics::WRAP_MODE wrapMode)
 		break;
 	}
 
+	if (!m_bReady)
+		return;
+
 	createOrUpdateSampler();
+}
+
+void DirectX11Image::createOrUpdateSampler()
+{
+	if (m_samplerState != NULL)
+	{
+		m_samplerState->Release();
+		m_samplerState = NULL;
+	}
+
+	((DirectX11Interface*)engine->getGraphics())->getDevice()->CreateSamplerState(&m_samplerDesc, &m_samplerState);
 }
 
 #endif

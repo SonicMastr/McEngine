@@ -31,7 +31,7 @@
 #define TEXTURE_FREE_MEMORY_ATI                 0x87FC
 #define RENDERBUFFER_FREE_MEMORY_ATI            0x87FD
 
-ConVar r_image_unbind_after_drawimage("r_image_unbind_after_drawimage", true);
+ConVar r_image_unbind_after_drawimage("r_image_unbind_after_drawimage", true, FCVAR_NONE);
 
 OpenGLLegacyInterface::OpenGLLegacyInterface() : Graphics()
 {
@@ -683,34 +683,46 @@ UString OpenGLLegacyInterface::getVersion()
 
 int OpenGLLegacyInterface::getVRAMTotal()
 {
-	int nvidiaMemory = -1;
-	int atiMemory = -1;
+	int nvidiaMemory[4];
+	int atiMemory[4];
+	
+	for (int i=0; i<4; i++)
+	{
+		nvidiaMemory[i] = -1;
+		atiMemory[i] = -1;
+	}
 
-	glGetIntegerv(GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &nvidiaMemory);
-	glGetIntegerv(TEXTURE_FREE_MEMORY_ATI, &atiMemory);
+	glGetIntegerv(GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, nvidiaMemory);
+	glGetIntegerv(TEXTURE_FREE_MEMORY_ATI, atiMemory);
 
 	glGetError(); // clear error state
 
-	if (nvidiaMemory < 1)
-		return atiMemory;
+	if (nvidiaMemory[0] < 1)
+		return atiMemory[0];
 	else
-		return nvidiaMemory;
+		return nvidiaMemory[0];
 }
 
 int OpenGLLegacyInterface::getVRAMRemaining()
 {
-	int nvidiaMemory = -1;
-	int atiMemory = -1;
+	int nvidiaMemory[4];
+	int atiMemory[4];
+	
+	for (int i=0; i<4; i++)
+	{
+		nvidiaMemory[i] = -1;
+		atiMemory[i] = -1;
+	}
 
-	glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &nvidiaMemory);
-	glGetIntegerv(TEXTURE_FREE_MEMORY_ATI, &atiMemory);
+	glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, nvidiaMemory);
+	glGetIntegerv(TEXTURE_FREE_MEMORY_ATI, atiMemory);
 
 	glGetError(); // clear error state
 
-	if (nvidiaMemory < 1)
-		return atiMemory;
+	if (nvidiaMemory[0] < 1)
+		return atiMemory[0];
 	else
-		return nvidiaMemory;
+		return nvidiaMemory[0];
 }
 
 void OpenGLLegacyInterface::onResolutionChange(Vector2 newResolution)
@@ -750,6 +762,16 @@ Shader *OpenGLLegacyInterface::createShaderFromFile(UString vertexShaderFilePath
 Shader *OpenGLLegacyInterface::createShaderFromSource(UString vertexShader, UString fragmentShader)
 {
 	return new OpenGLShader(vertexShader, fragmentShader, true);
+}
+
+Shader *OpenGLLegacyInterface::createShaderFromFile(UString shaderFilePath)
+{
+	return new OpenGLShader(shaderFilePath, false);
+}
+
+Shader *OpenGLLegacyInterface::createShaderFromSource(UString shaderSource)
+{
+	return new OpenGLShader(shaderSource, true);
 }
 
 VertexArrayObject *OpenGLLegacyInterface::createVertexArrayObject(Graphics::PRIMITIVE primitive, Graphics::USAGE_TYPE usage, bool keepInSystemMemory)

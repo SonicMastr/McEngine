@@ -103,7 +103,7 @@ void OpenGLES2Interface::init()
 								"\n";
 
 	UString texturedGenericP =	"#version 100\n"
-								"precision mediump float;\n"
+								"precision highp float;\n"
 								"\n"
 								"varying vec2 texcoords;\n"
 								"varying vec4 texcolor;\n"
@@ -661,34 +661,46 @@ void OpenGLES2Interface::setWireframe(bool enabled)
 
 int OpenGLES2Interface::getVRAMTotal()
 {
-	int nvidiaMemory = -1;
-	int atiMemory = -1;
+	int nvidiaMemory[4];
+	int atiMemory[4];
+	
+	for (int i=0; i<4; i++)
+	{
+		nvidiaMemory[i] = -1;
+		atiMemory[i] = -1;
+	}
 
-	glGetIntegerv(GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &nvidiaMemory);
-	glGetIntegerv(TEXTURE_FREE_MEMORY_ATI, &atiMemory);
+	glGetIntegerv(GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, nvidiaMemory);
+	glGetIntegerv(TEXTURE_FREE_MEMORY_ATI, atiMemory);
 
 	glGetError(); // clear error state
 
-	if (nvidiaMemory < 1)
-		return atiMemory;
+	if (nvidiaMemory[0] < 1)
+		return atiMemory[0];
 	else
-		return nvidiaMemory;
+		return nvidiaMemory[0];
 }
 
 int OpenGLES2Interface::getVRAMRemaining()
 {
-	int nvidiaMemory = -1;
-	int atiMemory = -1;
+	int nvidiaMemory[4];
+	int atiMemory[4];
+	
+	for (int i=0; i<4; i++)
+	{
+		nvidiaMemory[i] = -1;
+		atiMemory[i] = -1;
+	}
 
-	glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &nvidiaMemory);
-	glGetIntegerv(TEXTURE_FREE_MEMORY_ATI, &atiMemory);
+	glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, nvidiaMemory);
+	glGetIntegerv(TEXTURE_FREE_MEMORY_ATI, atiMemory);
 
 	glGetError(); // clear error state
 
-	if (nvidiaMemory < 1)
-		return atiMemory;
+	if (nvidiaMemory[0] < 1)
+		return atiMemory[0];
 	else
-		return nvidiaMemory;
+		return nvidiaMemory[0];
 }
 
 void OpenGLES2Interface::onResolutionChange(Vector2 newResolution)
@@ -728,6 +740,16 @@ Shader *OpenGLES2Interface::createShaderFromFile(UString vertexShaderFilePath, U
 Shader *OpenGLES2Interface::createShaderFromSource(UString vertexShader, UString fragmentShader)
 {
 	return new OpenGLES2Shader(vertexShader, fragmentShader, true);
+}
+
+Shader *OpenGLES2Interface::createShaderFromFile(UString shaderFilePath)
+{
+	return new OpenGLES2Shader(shaderFilePath, false);
+}
+
+Shader *OpenGLES2Interface::createShaderFromSource(UString shaderSource)
+{
+	return new OpenGLES2Shader(shaderSource, true);
 }
 
 VertexArrayObject *OpenGLES2Interface::createVertexArrayObject(Graphics::PRIMITIVE primitive, Graphics::USAGE_TYPE usage, bool keepInSystemMemory)

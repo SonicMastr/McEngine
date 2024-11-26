@@ -35,13 +35,15 @@ public:
 	ID3D11Texture2D *getTexture() const {return m_texture;}
 	ID3D11ShaderResourceView *getShaderResourceView() const {return m_shaderResourceView;}
 
-private:
+protected:
 	virtual void init();
 	virtual void initAsync();
 	virtual void destroy();
 
+private:
 	void createOrUpdateSampler();
 
+private:
 	ID3D11Texture2D *m_texture;
 	ID3D11ShaderResourceView *m_shaderResourceView;
 	ID3D11SamplerState *m_samplerState;
