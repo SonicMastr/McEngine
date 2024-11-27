@@ -26,12 +26,17 @@
 /*
  * OpenGL graphics (Mobile, ES/EGL)
  */
-#define MCENGINE_FEATURE_OPENGLES
+//#define MCENGINE_FEATURE_OPENGLES
 
 /*
  * DirectX 11 graphics
  */
 //#define MCENGINE_FEATURE_DIRECTX11
+
+/*
+ * GXM graphics
+ */
+#define MCENGINE_FEATURE_GXM
 
 /*
  * ENet & CURL networking

@@ -4,7 +4,7 @@
 int _newlib_heap_size_user = 100 * 1024 * 1024;
 unsigned int sceLibcHeapSize = 30 * 1024 * 1024;
 #else
-int _newlib_heap_size_user = 340 * 1024 * 1024;
+int _newlib_heap_size_user = 150 * 1024 * 1024;
 #endif
 
 #include "cbase.h"

@@ -12,7 +12,7 @@
 #define MCENGINE_SDL_JOYSTICK
 #define MCENGINE_SDL_JOYSTICK_MOUSE
 
-#if !defined(MCENGINE_FEATURE_OPENGL) && !defined(MCENGINE_FEATURE_OPENGLES)
+#if !defined(MCENGINE_FEATURE_OPENGL) && !defined(MCENGINE_FEATURE_OPENGLES) && !defined(MCENGINE_FEATURE_GXM)
 #error OpenGL support is currently required for SDL
 #endif
 

@@ -16,6 +16,7 @@
 #include "NullGraphicsInterface.h"
 #include "SDLGLLegacyInterface.h"
 #include "SDLGLES2Interface.h"
+#include "SDLGXMInterface.h"
 #include "WinSDLGLES2Interface.h"
 #include "NullContextMenu.h"
 
@@ -72,6 +73,12 @@ Graphics *SDLEnvironment::createRenderer()
 #else
 
 	return new SDLGLES2Interface(m_window);
+
+#endif
+
+#ifdef MCENGINE_FEATURE_GXM
+
+	return new SDLGXMInterface(m_window);
 
 #endif
 
